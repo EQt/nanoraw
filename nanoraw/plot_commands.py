@@ -1,7 +1,7 @@
 import os, sys
 
 import h5py
-import Queue
+import queue
 
 import numpy as np
 import multiprocessing as mp
@@ -12,8 +12,8 @@ from itertools import repeat, groupby
 from pkg_resources import resource_string
 
 # import nanoraw functions
-import nanoraw_stats as ns
-import nanoraw_helper as nh
+from . import nanoraw_stats as ns
+from . import nanoraw_helper as nh
 
 VERBOSE = False
 
@@ -85,15 +85,15 @@ def plot_kmer_dist(files, corrected_group, basecall_subgroups,
         # each k-mer has the requested number of occurences
         if kmer_thresh == 0 or (
                 len(read_kmers) == 4 ** kmer_len and min(
-                    len(x) for x in read_kmers.values()) > kmer_thresh):
+                    len(x) for x in list(read_kmers.values())) > kmer_thresh):
             reads_added += 1
-            for kmer, kmer_means in read_kmers.items():
+            for kmer, kmer_means in list(read_kmers.items()):
                 if read_mean:
                     all_kmers[kmer].append((
                         np.mean(kmer_means), reads_added))
                 else:
                     all_kmers[kmer].extend(
-                        zip(kmer_means, repeat(reads_added)))
+                        list(zip(kmer_means, repeat(reads_added))))
 
         if reads_added >= num_reads:
             break
@@ -116,8 +116,8 @@ def plot_kmer_dist(files, corrected_group, basecall_subgroups,
 
     if VERBOSE: sys.stderr.write('Preparing plot data.\n')
     kmer_levels = [kmer for means, kmer in sorted([
-        (np.mean(zip(*means)[0]), kmer)
-        for kmer, means in all_kmers.items()])]
+        (np.mean(list(zip(*means))[0]), kmer)
+        for kmer, means in list(all_kmers.items())])]
 
     plot_data = [
         (kmer, kmer[upstrm_bases], sig_mean, read_i)
@@ -126,11 +126,11 @@ def plot_kmer_dist(files, corrected_group, basecall_subgroups,
 
     kmerDat = r.DataFrame({
         'Kmer':r.FactorVector(
-            r.StrVector(zip(*plot_data)[0]),
+            r.StrVector(list(zip(*plot_data))[0]),
             ordered=True, levels=r.StrVector(kmer_levels)),
-        'Base':r.StrVector(zip(*plot_data)[1]),
-        'Signal':r.FloatVector(zip(*plot_data)[2]),
-        'Read':r.StrVector(zip(*plot_data)[3])})
+        'Base':r.StrVector(list(zip(*plot_data))[1]),
+        'Signal':r.FloatVector(list(zip(*plot_data))[2]),
+        'Read':r.StrVector(list(zip(*plot_data))[3])})
     # df to plot kmers as tile of colors requires cowplot R package
     try:
         cowplot = importr("cowplot")
@@ -179,7 +179,7 @@ def get_read_correction_data(
         filename, reg_type, reg_width, corr_basecall_group,
         region_name=None, start_at_zero=False):
     fast5_data = h5py.File(filename, 'r')
-    raw_grp = fast5_data['/Raw/Reads'].values()[0]
+    raw_grp = list(fast5_data['/Raw/Reads'].values())[0]
     if ( '/Analyses/' + corr_basecall_group) not in fast5_data:
         fast5_data.close()
         return None, None, None, None
@@ -275,21 +275,21 @@ def get_read_correction_data(
                     old_is_del.append(False)
                 old_is_mismatch.append(old_b != new_b)
 
-    old_bases, old_reg_segs = zip(*[
+    old_bases, old_reg_segs = list(zip(*[
         (b, pos) for b, pos, in_reg in zip(*reg_align_vals)[0]
-        if in_reg]) if len(reg_align_vals) > 0 else ([], [])
-    new_bases, new_reg_segs = zip(*[
+        if in_reg])) if len(reg_align_vals) > 0 else ([], [])
+    new_bases, new_reg_segs = list(zip(*[
         (b, pos) for b, pos, in_reg in zip(*reg_align_vals)[1]
-        if in_reg]) if len(reg_align_vals) > 0 else ([], [])
+        if in_reg])) if len(reg_align_vals) > 0 else ([], [])
 
     # bring positions to zero start if aligning multiple sequences
-    sig_range = range(reg_start, reg_start + reg_width)
+    sig_range = list(range(reg_start, reg_start + reg_width))
     if start_at_zero:
         old_reg_segs = [
             old_seg_pos - reg_start for old_seg_pos in old_reg_segs]
         new_reg_segs = [
             new_seg_pos - reg_start for new_seg_pos in new_reg_segs]
-        sig_range = range(0, reg_width)
+        sig_range = list(range(0, reg_width))
 
     old_dat = {
         'Position':r.FloatVector(old_reg_segs),
@@ -498,7 +498,7 @@ def get_signal(read_fn, read_start_rel_to_raw, num_obs, corrected_group):
         lower_lim = corr_subgrp.attrs['lower_lim']
         upper_lim = corr_subgrp.attrs['upper_lim']
         r_sig, scale_values = nh.normalize_raw_signal(
-            fast5_data['/Raw/Reads'].values()[0]['Signal'],
+            list(fast5_data['/Raw/Reads'].values())[0]['Signal'],
             read_start_rel_to_raw, num_obs, shift=shift, scale=scale,
             lower_lim=lower_lim, upper_lim=upper_lim)
 
@@ -765,16 +765,16 @@ def plot_multi_corrections(
         files, corrected_group, basecall_subgroups)
     read_coverage = nh.get_coverage(raw_read_coverage)
     coverage_regions = []
-    for chrom_strand, chrom_coverage in read_coverage.items():
+    for chrom_strand, chrom_coverage in list(read_coverage.items()):
         chrm_coverage_regions = [
             (x, len(list(y))) for x, y in groupby(chrom_coverage)]
         chrm_reg_starts = np.cumsum(np.insert(
-            zip(*chrm_coverage_regions)[1], 0, 0))
-        coverage_regions.extend(zip(
-            zip(*chrm_coverage_regions)[0],
+            list(zip(*chrm_coverage_regions))[1], 0, 0))
+        coverage_regions.extend(list(zip(
+            list(zip(*chrm_coverage_regions))[0],
             [start + (reg_len / 2) for start, reg_len in
-             zip(chrm_reg_starts, zip(*chrm_coverage_regions)[1])],
-            repeat(chrom_strand[0]), repeat(chrom_strand[1])))
+             zip(chrm_reg_starts, list(zip(*chrm_coverage_regions))[1])],
+            repeat(chrom_strand[0]), repeat(chrom_strand[1]))))
 
     if genome_locations is None:
         # randomly select regions with at least num_reads_to_plot regions
@@ -783,9 +783,9 @@ def plot_multi_corrections(
             for stat, reg_center, chrm, strand in
             coverage_regions if stat >= num_reads_per_plot]
         np.random.shuffle(coverage_regions)
-        plot_intervals = zip(
+        plot_intervals = list(zip(
             ['{:03d}'.format(rn) for rn in range(num_regions)],
-            coverage_regions[:num_regions])
+            coverage_regions[:num_regions]))
         if len(plot_intervals) < num_regions:
             sys.stderr.write(
                 '*' * 60 + '\nWarning: Fewer regions contain minimum ' +
@@ -906,7 +906,7 @@ def get_plots_titles(regs_data, regs_data2, overplot_type,
 
     titles = []
     for (chrm, i_start, strand, stat), r_cov, r_ovp in zip(
-            zip(*plot_intervals)[1], strand_cov, dnspl_stars):
+            list(zip(*plot_intervals))[1], strand_cov, dnspl_stars):
         if regs_data2 is None:
             if strand is None:
                 titles.append(
@@ -941,7 +941,7 @@ def get_plots_titles(regs_data, regs_data2, overplot_type,
 
     Titles = r.DataFrame({
         'Title':r.StrVector(titles),
-        'Region':r.StrVector(zip(*plot_intervals)[0])})
+        'Region':r.StrVector(list(zip(*plot_intervals))[0])})
 
     return Titles, plot_types
 
@@ -983,7 +983,7 @@ def filter_group_regs(plot_intervals, grps_reg_data, grps_no_cov):
         for reg_no_covs in zip(*grps_no_cov)]
     both_no_cov_regs = [
         reg for reg_both_no_cov, reg in zip(
-            both_no_cov, zip(*grps_no_cov[0])[1]) if reg_both_no_cov]
+            both_no_cov, list(zip(*grps_no_cov[0]))[1]) if reg_both_no_cov]
     if any(both_no_cov) and VERBOSE:
         sys.stderr.write(
             '*' * 60 + '\nWarning: Some regions include no reads: ' +
@@ -998,9 +998,9 @@ def filter_group_regs(plot_intervals, grps_reg_data, grps_no_cov):
             + '*' * 60 + '\n')
         sys.exit()
 
-    grps_reg_data = zip(*[reg_data for reg_data, no_cov in
-                          zip(zip(*grps_reg_data), both_no_cov)
-                          if not no_cov])
+    grps_reg_data = list(zip(*[reg_data for reg_data, no_cov in
+                          zip(list(zip(*grps_reg_data)), both_no_cov)
+                          if not no_cov]))
 
     return plot_intervals, grps_reg_data
 
@@ -1056,7 +1056,7 @@ def plot_two_samples(
 
     if seqs_fn is not None:
         if VERBOSE: sys.stderr.write('Outputting region seqeuences.\n')
-        reg_seqs = zip(zip(*merged_reg_data)[0], all_reg_base_data)
+        reg_seqs = list(zip(list(zip(*merged_reg_data))[0], all_reg_base_data))
         with open(seqs_fn, 'w') as seqs_fp:
             for reg_i, reg_seq in reg_seqs:
                 chrm, start, strand, stat = next(
@@ -1110,12 +1110,12 @@ def plot_motif_centered_with_stats(
 
     # stat lists
     StatsFData = r.DataFrame({
-        'Position':r.FloatVector(zip(*pval_locs)[0]),
+        'Position':r.FloatVector(list(zip(*pval_locs))[0]),
         'NegLogFishersPValue':r.FloatVector(
-            zip(*zip(*pval_locs)[1])[0])})
+            list(zip(*list(zip(*pval_locs))[1]))[0])})
     StatsData = r.DataFrame({
-        'Position':r.FloatVector(zip(*pval_locs)[0]),
-        'NegLogPValue':r.FloatVector(zip(*zip(*pval_locs)[1])[1])})
+        'Position':r.FloatVector(list(zip(*pval_locs))[0]),
+        'NegLogPValue':r.FloatVector(list(zip(*list(zip(*pval_locs))[1]))[1])})
 
     if VERBOSE: sys.stderr.write('Plotting.\n')
     r.r(resource_string(__name__, 'R_scripts/plotMotifStats.R'))
@@ -1143,21 +1143,21 @@ def plot_max_coverage(
 
     if files2 is None:
         coverage_regions = []
-        for (chrom, strand), chrom_coverage in read_coverage.items():
+        for (chrom, strand), chrom_coverage in list(read_coverage.items()):
             chrm_coverage_regions = [
                 (x, len(list(y))) for x, y in groupby(chrom_coverage)]
-            coverage_regions.extend(zip(
-                zip(*chrm_coverage_regions)[0],
+            coverage_regions.extend(list(zip(
+                list(zip(*chrm_coverage_regions))[0],
                 np.cumsum(np.insert(
-                    zip(*chrm_coverage_regions)[1], 0, 0)),
-                repeat(chrom), repeat(strand)))
+                    list(zip(*chrm_coverage_regions))[1], 0, 0)),
+                repeat(chrom), repeat(strand))))
 
             # max coverage plots both strands coverage
-            plot_intervals = zip(
+            plot_intervals = list(zip(
                 ['{:03d}'.format(rn) for rn in range(num_regions)],
                 [(chrm, start, None, '')
                  for stat, start, chrm, strand in
-                 sorted(coverage_regions, reverse=True)[:num_regions]])
+                 sorted(coverage_regions, reverse=True)[:num_regions]]))
 
         plot_single_sample(
             plot_intervals, raw_read_coverage, num_bases,
@@ -1187,18 +1187,18 @@ def plot_max_coverage(
 
             chrm_coverage_regions = [
                 (x, len(list(y))) for x, y in groupby(merged_chrom_cov)]
-            coverage_regions.extend(zip(
-                zip(*chrm_coverage_regions)[0],
+            coverage_regions.extend(list(zip(
+                list(zip(*chrm_coverage_regions))[0],
                 np.cumsum(np.insert(
-                    zip(*chrm_coverage_regions)[1], 0, 0)),
-                repeat(chrom), repeat(strand)))
+                    list(zip(*chrm_coverage_regions))[1], 0, 0)),
+                repeat(chrom), repeat(strand))))
 
             # max coverage plots both strands coverage
-            plot_intervals = zip(
+            plot_intervals = list(zip(
                 ['{:03d}'.format(rn) for rn in range(num_regions)],
                 [(chrm, start, None, '')
                  for stat, start, chrm, strand in
-                 sorted(coverage_regions, reverse=True)[:num_regions]])
+                 sorted(coverage_regions, reverse=True)[:num_regions]]))
 
         plot_two_samples(
             plot_intervals, raw_read_coverage, raw_read_coverage2,
@@ -1258,7 +1258,7 @@ def plot_motif_centered(
     def get_motif_locs(covered_chrms):
         # TODO: search over negative strand as well
         motif_locs = []
-        for chrm, seq in fasta_records.iteritems():
+        for chrm, seq in fasta_records.items():
             if chrm not in covered_chrms: continue
             for motif_loc in motif_pat.finditer(seq):
                 motif_locs.append((chrm, motif_loc.start()))
@@ -1291,7 +1291,7 @@ def plot_motif_centered(
             raw_read_coverage2, obs_filter)
 
         covered_chrms = set(zip(*raw_read_coverage)[0]).intersection(
-            zip(*raw_read_coverage2)[0])
+            list(zip(*raw_read_coverage2))[0])
         # filter out motif_locs to chromosomes not covered
         motif_locs = get_motif_locs(covered_chrms)
 
@@ -1317,15 +1317,15 @@ def plot_motif_centered(
                     + '*' * 60 + '\n')
                 sys.exit()
 
-            plot_intervals = zip(
+            plot_intervals = list(zip(
                 ['{:03d}'.format(rn) for rn in range(num_regions)],
                 ((chrm, max(pos - int(
                     (num_bases - motif_len + 1) / 2.0), 0), '+', '')
-                 for cov, chrm, pos in motif_locs_cov))
+                 for cov, chrm, pos in motif_locs_cov)))
         else:
             # zip over iterator of regions that have at least a
             # read overlapping so we don't have to check all reads
-            plot_intervals = zip(
+            plot_intervals = list(zip(
                 ['{:03d}'.format(rn) for rn in range(num_regions)],
                 ((chrm, max(pos - int(
                     (num_bases - motif_len + 1) / 2.0), 0), strand, '')
@@ -1336,7 +1336,7 @@ def plot_motif_centered(
                                  (chrm, strand)]) and
                      any(r_data2.start < pos < r_data2.end
                          for r_data2 in raw_read_coverage2[
-                                 (chrm, strand)]))))
+                                 (chrm, strand)])))))
 
         plot_two_samples(
             plot_intervals, raw_read_coverage, raw_read_coverage2,
@@ -1354,29 +1354,29 @@ def plot_motif_centered(
                 try:
                     return min(read_coverage[(chrm, '+')][pos],
                                read_coverage[(chrm, '-')][pos])
-                except IndexError, KeyError:
+                except IndexError as KeyError:
                     return 0
             motif_locs_cov = [
                 (get_cov(chrm, pos), chrm, pos)
                 for chrm, pos in motif_locs]
 
-            plot_intervals = zip(
+            plot_intervals = list(zip(
                 ['{:03d}'.format(rn) for rn in range(num_regions)],
                 ((chrm, max(pos - int(
                     (num_bases - motif_len + 1) / 2.0), 0), '+', '')
                  for cov, chrm, pos in sorted(
-                         motif_locs_cov, reverse=True)))
+                         motif_locs_cov, reverse=True))))
         else:
             # zip over iterator of regions that have at least a
             # read overlapping so we don't have to check all reads
-            plot_intervals = zip(
+            plot_intervals = list(zip(
                 ['{:03d}'.format(rn) for rn in range(num_regions)],
                 ((chrm, max(pos - int(
                     (num_bases - motif_len + 1) / 2.0), 0), '+', '')
                  for chrm, pos in motif_locs
                  if any(r_data.start < pos < r_data.end
                         for r_data in raw_read_coverage[(chrm, '+')] +
-                        raw_read_coverage[(chrm, '-')])))
+                        raw_read_coverage[(chrm, '-')]))))
 
         plot_single_sample(
             plot_intervals, raw_read_coverage, num_bases,
@@ -1414,7 +1414,7 @@ def plot_max_diff(
     # get num_region max diff regions from each chrm then find
     # global largest after
     largest_diff_indices = []
-    for chrm, chrm_size in chrm_sizes.items():
+    for chrm, chrm_size in list(chrm_sizes.items()):
         for strand in ('+', '-'):
             # calculate difference and set no coverage (nan) values
             # to zero
@@ -1427,11 +1427,11 @@ def plot_max_diff(
                 chrm_diffs[pos], max(pos - int(num_bases / 2.0), 0),
                 chrm, strand) for pos in chrm_max_diff_regs)
 
-    plot_intervals = zip(
+    plot_intervals = list(zip(
         ['{:03d}'.format(rn) for rn in range(num_regions)],
         [(chrm, start, strand, '(Mean diff: {:.2f})'.format(stat))
          for stat, start, chrm, strand in
-         sorted(largest_diff_indices, reverse=True)[:num_regions]])
+         sorted(largest_diff_indices, reverse=True)[:num_regions]]))
 
     plot_two_samples(
         plot_intervals, raw_read_coverage1, raw_read_coverage2,
@@ -1491,7 +1491,7 @@ def get_region_sequences(
     all_reg_base_data = get_reg_base_data(
         merged_reg_data, corrected_group, num_bases)
 
-    return zip(zip(*merged_reg_data)[0], all_reg_base_data)
+    return list(zip(list(zip(*merged_reg_data))[0], all_reg_base_data))
 
 def plot_motif_centered_signif(
         files1, files2, num_regions, corrected_group, basecall_subgroups,
@@ -1548,11 +1548,11 @@ def plot_motif_centered_signif(
 
     # get plot intervals for all stat regions then trim to
     # num_regions after getting all p-values for plotting
-    plot_intervals = zip(
+    plot_intervals = list(zip(
         ['{:03d}'.format(rn) for rn in range(num_stat_values)],
         [(chrm, pos - motif_len + offset - context_width + 1, strand, '')
          for pos, chrm, strand, offset in
-         motif_regions_data])
+         motif_regions_data]))
     plot_width = motif_len + (context_width * 2)
     # need to handle forward and reverse strand stats separately since
     # reverse strand stats are in reverse order wrt motif
@@ -1580,7 +1580,7 @@ def plot_motif_centered_signif(
     for p_int, (chrm, start, strand, reg_name) in plot_intervals:
         # could have significant region immediately next to
         # beginning/end of reads
-        interval_poss = range(start, start + plot_width)
+        interval_poss = list(range(start, start + plot_width))
         if start not in used_intervals[(chrm, strand)] and all(
                 pos in covered_poss[(chrm, strand)]
                 for pos in interval_poss):
@@ -1641,8 +1641,8 @@ def cluster_most_signif(
     for p_int, (chrm, start, strand, reg_name) in plot_intervals:
         # could have significant region immediately next to
         # beginning/end of reads
-        interval_poss = range(
-            start, start + num_bases + (slide_span * 2))
+        interval_poss = list(range(
+            start, start + num_bases + (slide_span * 2)))
         if start not in used_intervals[(chrm, strand)] and all(
                 pos in covered_poss[(chrm, strand)]
                 for pos in interval_poss):
@@ -1662,10 +1662,10 @@ def cluster_most_signif(
             in uniq_p_intervals]
         if fasta_fn is None:
             # add region sequences to column names for saved dist matrix
-            reg_seqs = zip(*get_region_sequences(
+            reg_seqs = list(zip(*get_region_sequences(
                 seq_intervals, raw_read_coverage1, raw_read_coverage2,
                 num_bases + (slide_span * 2) + (expand_pos * 2),
-                corrected_group))[1]
+                corrected_group)))[1]
         else:
             fasta_records = nh.parse_fasta(fasta_fn)
             reg_seqs = [
@@ -1716,7 +1716,7 @@ def cluster_most_signif(
 
     args = (reg_sig_diffs, index_q, dists_q, slide_span)
     processes = []
-    for p_id in xrange(num_processes):
+    for p_id in range(num_processes):
         p = mp.Process(target=ns.get_pairwise_dists,
                        args=args)
         p.start()
@@ -1727,7 +1727,7 @@ def cluster_most_signif(
         try:
             row_dists = dists_q.get(block=False)
             reg_sig_diff_dists.append(row_dists)
-        except Queue.Empty:
+        except queue.Empty:
             sleep(1)
             continue
     # empty any entries left in queue after processes have finished
@@ -1735,7 +1735,7 @@ def cluster_most_signif(
         row_dists = dists_q.get(block=False)
         reg_sig_diff_dists.append(row_dists)
 
-    reg_sig_diff_dists = zip(*sorted(reg_sig_diff_dists))[1]
+    reg_sig_diff_dists = list(zip(*sorted(reg_sig_diff_dists)))[1]
 
     reg_sig_diff_dists = r.r.matrix(
         r.FloatVector(np.concatenate(reg_sig_diff_dists)),
@@ -1776,7 +1776,7 @@ def plot_correction_main(args):
         sys.exit()
 
     files = nh.get_files_list(args.fast5_basedirs)
-    plot_intervals = zip(files, repeat(args.region_type))
+    plot_intervals = list(zip(files, repeat(args.region_type)))
     plot_corrections(
         plot_intervals, args.num_obs, args.num_reads,
         args.corrected_group, args.basecall_subgroup, args.pdf_filename)
@@ -2009,5 +2009,5 @@ def cluster_signif_diff_main(args):
     return
 
 if __name__ == '__main__':
-    raise NotImplementedError, (
-        'This is a module. See commands with `nanoraw -h`')
+    raise NotImplementedError((
+        'This is a module. See commands with `nanoraw -h`'))

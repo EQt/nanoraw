@@ -4,8 +4,8 @@ import numpy as np
 
 from collections import defaultdict
 
-import nanoraw_stats as ns
-import nanoraw_helper as nh
+from . import nanoraw_stats as ns
+from . import nanoraw_helper as nh
 
 VERBOSE = False
 
@@ -27,7 +27,7 @@ def write_wiggle(wig_base, group_text, data_values, type_name,
         wig_base, type_name, 'fwd_strand', group_w_us, group_w_space))
     minus_wig_fp.write(WIG_HEADER.format(
         wig_base, type_name, 'rev_strand', group_w_us, group_w_space))
-    for (chrm, strand), chrm_values in data_values.iteritems():
+    for (chrm, strand), chrm_values in data_values.items():
         wig_fp = plus_wig_fp if strand == '+' else minus_wig_fp
         wig_fp.write("variableStep chrom={} span=1\n".format(chrm))
         wig_fp.write('\n'.join([
@@ -51,10 +51,10 @@ def write_pvals_and_qvals_wig(
 
     chrm_strand_pvals = {}
     chrm_strand_qvals = {}
-    for chrm_strand, stats in raw_chrm_strand_stats.iteritems():
-        chrm_poss = zip(*stats)[0]
-        raw_chrm_pvals = zip(*stats)[1]
-        raw_chrm_qvals = zip(*stats)[2]
+    for chrm_strand, stats in raw_chrm_strand_stats.items():
+        chrm_poss = list(zip(*stats))[0]
+        raw_chrm_pvals = list(zip(*stats))[1]
+        raw_chrm_qvals = list(zip(*stats))[2]
         max_pos = max(chrm_poss)
 
         # arrange and store p-values
@@ -82,19 +82,19 @@ def write_pvals_and_qvals_wig(
 def get_chrm_sizes(raw_read_coverage, raw_read_coverage2=None):
     strand_chrm_sizes = defaultdict(list)
     for (chrm, strand), cs_read_cov in \
-      raw_read_coverage.iteritems():
+      raw_read_coverage.items():
         strand_chrm_sizes[chrm].append(max(
           r_data.end for r_data in cs_read_cov))
     if raw_read_coverage2 is not None:
         for (chrm, strand), cs_read_cov in \
-          raw_read_coverage2.iteritems():
+          raw_read_coverage2.items():
             strand_chrm_sizes[chrm].append(max(
               r_data.end for r_data in cs_read_cov))
 
     return dict(
         (chrm, max(strnd_sizes))
         for chrm, strnd_sizes in
-        strand_chrm_sizes.iteritems())
+        strand_chrm_sizes.items())
 
 def write_length_wig(
         raw_read_coverage, chrm_sizes, wig_base, group_name):
@@ -128,7 +128,7 @@ def write_signal_and_diff_wigs(
             if VERBOSE: sys.stderr.write(
                     'Calculating signal differences.\n')
             sig_diffs = {}
-            for chrm, strand in [(c, s) for c in chrm_sizes.keys()
+            for chrm, strand in [(c, s) for c in list(chrm_sizes.keys())
                                  for s in ('+', '-')]:
                 # calculate difference and set no coverage
                 # (nan) values to zero
@@ -332,5 +332,5 @@ def write_signif_diff_main(args):
 
 
 if __name__ == '__main__':
-    raise NotImplementedError, (
-        'This is a module. See commands with `nanoraw -h`')
+    raise NotImplementedError((
+        'This is a module. See commands with `nanoraw -h`'))

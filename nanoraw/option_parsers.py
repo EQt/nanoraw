@@ -809,5 +809,5 @@ def get_write_signif_diff_parser():
 
 
 if __name__ == '__main__':
-    raise NotImplementedError, (
+    raise NotImplementedError(
         'This is a module. See commands with `nanoraw -h`')

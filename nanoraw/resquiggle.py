@@ -2,7 +2,7 @@ import os, sys
 
 import re
 import h5py
-import Queue
+import queue
 
 import numpy as np
 np.seterr(all='raise')
@@ -13,12 +13,12 @@ from time import sleep, time
 from subprocess import call, STDOUT
 from tempfile import NamedTemporaryFile
 from distutils.version import LooseVersion
-from itertools import groupby, izip, repeat
+from itertools import groupby, repeat
 from collections import defaultdict, namedtuple
 
 # import nanoraw functions
-import option_parsers
-import nanoraw_helper as nh
+from . import option_parsers
+from . import nanoraw_helper as nh
 
 VERBOSE = False
 
@@ -64,22 +64,22 @@ def write_new_fast5_group(
             for base_sig in np.split(norm_signal, new_segs[1:-1])]
 
         event_data = np.array(
-            zip(zip(*norm_mean_sd)[0], zip(*norm_mean_sd)[1],
-                new_segs[:-1], np.diff(new_segs), list(align_seq)),
+            list(zip(list(zip(*norm_mean_sd))[0], list(zip(*norm_mean_sd))[1],
+                new_segs[:-1], np.diff(new_segs), list(align_seq))),
             dtype=[('norm_mean', '<f8'), ('norm_stdev', '<f8'),
                    ('start', '<u4'), ('length', '<u4'), ('base', 'S1')])
 
         np_read_align = np.chararray(len(alignVals))
-        np_read_align[:] = zip(*alignVals)[0]
+        np_read_align[:] = list(zip(*alignVals))[0]
         np_genome_align = np.chararray(len(alignVals))
-        np_genome_align[:] = zip(*alignVals)[1]
+        np_genome_align[:] = list(zip(*alignVals))[1]
     except:
-        raise NotImplementedError, 'Error computing new events.'
+        raise NotImplementedError('Error computing new events.')
 
     try:
         read_data = h5py.File(filename, 'r+')
     except:
-        raise NotImplementedError, (
+        raise NotImplementedError(
             'Error opening file for new group writing. This should ' +
             'have been caught during the alignment phase. Check that ' +
             'there are no other nanoraw processes or processes ' +
@@ -123,14 +123,14 @@ def write_new_fast5_group(
         corr_events.attrs[
             'read_start_rel_to_raw'] = read_start_rel_to_raw
     except:
-        raise NotImplementedError, (
-            'Error writing resquiggle information back into fast5 file.')
+        raise NotImplementedError((
+            'Error writing resquiggle information back into fast5 file.'))
 
     try:
         read_data.flush()
         read_data.close()
     except:
-        raise NotImplementedError, (
+        raise NotImplementedError(
             'Error closing fast5 file after writing resquiggle ' +
             'information.')
 
@@ -152,8 +152,8 @@ def get_indel_groups(
             [(0,0), (len(read_align), len(read_align))])
         btwn_indel_seqs = [
             genome_align[m_start:m_end] for m_start, m_end in
-            zip(zip(*all_indel_locs)[1][:-1],
-                zip(*all_indel_locs)[0][1:])]
+            zip(list(zip(*all_indel_locs))[1][:-1],
+                list(zip(*all_indel_locs))[0][1:])]
         # is each indel an ins(ertion) or deletion
         all_is_ins = [read_align[start:end].startswith('-')
                       for start, end in all_indel_locs[1:-1]]
@@ -232,7 +232,7 @@ def get_indel_groups(
         Still need to test this function for off by one bugs etc.
         """
         if num_cpts_limit is not None and num_cpts > num_cpts_limit:
-            raise RuntimeError, ('Reached maximum number of ' +
+            raise RuntimeError('Reached maximum number of ' +
                                  'changepoints for a single indel')
         sig_cs = raw_signal[align_segs[group_start]:
                             align_segs[group_stop]]
@@ -246,8 +246,8 @@ def get_indel_groups(
         for pos in running_diffs.argsort()[::-1]:
             if pos not in blacklist_pos:
                 cpts.append(pos)
-                blacklist_pos.update(range(
-                    pos-min_seg_len+1, pos+min_seg_len+1))
+                blacklist_pos.update(list(range(
+                    pos-min_seg_len+1, pos+min_seg_len+1)))
             if len(cpts) == num_cpts:
                 break
         if len(cpts) < num_cpts:
@@ -286,7 +286,7 @@ def get_indel_groups(
     curr_group = [all_indels[0],]
     for indel in all_indels[1:]:
         if timeout is not None and time() - timeout_start > timeout:
-            raise RuntimeError, 'Read took too long to re-segment.'
+            raise RuntimeError('Read took too long to re-segment.')
         # check if indel hits current group
         if max(g_indel.end for g_indel in curr_group) >= indel.start:
             curr_group.append(indel)
@@ -329,8 +329,8 @@ def resquiggle_read(
         channel_info = nh.get_channel_info(fast5_data)
 
         # extract raw data for this read
-        all_raw_signal = fast5_data[
-            '/Raw/Reads/'].values()[0]['Signal'].value
+        all_raw_signal = list(fast5_data[
+            '/Raw/Reads/'].values())[0]['Signal'].value
         event_means, event_kmers = None, None
         if norm_type == 'pA':
             event_data = fast5_data[
@@ -340,7 +340,7 @@ def resquiggle_read(
             event_kmers = event_data['model_state']
         fast5_data.close()
     except:
-        raise NotImplementedError, (
+        raise NotImplementedError(
             'Error opening file for re-squiggle. This should have ' +
             'been caught during the alignment phase. Check that there ' +
             'are no other nanoraw processes or processes accessing ' +
@@ -371,19 +371,19 @@ def resquiggle_read(
     new_segs.append(starts_rel_to_read[prev_stop:])
     new_segs = np.concatenate(new_segs)
     if min(np.diff(new_segs)) < 1:
-        raise NotImplementedError, (
-            'New segments include zero length events.')
+        raise NotImplementedError((
+            'New segments include zero length events.'))
     if new_segs[0] < 0:
-        raise NotImplementedError, (
-            'New segments start with negative index.')
+        raise NotImplementedError((
+            'New segments start with negative index.'))
     if new_segs[-1] > norm_signal.shape[0]:
-        raise NotImplementedError, (
-            'New segments end past raw signal values.')
+        raise NotImplementedError((
+            'New segments end past raw signal values.'))
 
     # get just from alignVals
     align_seq = ''.join(zip(*alignVals)[1]).replace('-', '')
     if new_segs.shape[0] != len(align_seq) + 1:
-        raise ValueError, ('Aligned sequence does not match number ' +
+        raise ValueError('Aligned sequence does not match number ' +
                            'of segments produced.')
 
     if in_place:
@@ -411,7 +411,7 @@ def resquiggle_worker(
             # None values placed in queue when all files have
             # been processed
             if fast5_fn is None: break
-        except Queue.Empty:
+        except queue.Empty:
             sleep(1)
             continue
 
@@ -463,7 +463,7 @@ def fix_all_clipped_bases(batch_align_data, batch_reads_data):
     clip_fix_align_data = []
     for read_fn_sg, (
             alignVals, genome_loc, start_clipped_bases,
-            end_clipped_bases) in batch_align_data.iteritems():
+            end_clipped_bases) in batch_align_data.items():
         (read_start_rel_to_raw, starts_rel_to_read, basecalls,
          channel_info, read_id) = batch_reads_data[read_fn_sg]
         # fix raw start positions to match bases clipped in mapping
@@ -533,15 +533,15 @@ def clip_m5_alignment(alignVals, start, strand, chrm):
 
 def parse_m5_record(r_m5_record):
     if r_m5_record['tStrand'] != '+':
-        raise NotImplementedError, (
-            'Mapping indicates negative strand reference mapping.')
+        raise NotImplementedError((
+            'Mapping indicates negative strand reference mapping.'))
 
     if r_m5_record['qStrand'] == "+":
-        alignVals = zip(r_m5_record['qAlignedSeq'],
-                        r_m5_record['tAlignedSeq'])
+        alignVals = list(zip(r_m5_record['qAlignedSeq'],
+                        r_m5_record['tAlignedSeq']))
     else:
-        alignVals = zip(nh.rev_comp(r_m5_record['qAlignedSeq']),
-                        nh.rev_comp(r_m5_record['tAlignedSeq']))
+        alignVals = list(zip(nh.rev_comp(r_m5_record['qAlignedSeq']),
+                        nh.rev_comp(r_m5_record['tAlignedSeq'])))
 
     alignVals, start_clipped_bases, end_clipped_bases, genome_loc \
         = clip_m5_alignment(
@@ -553,9 +553,9 @@ def parse_m5_record(r_m5_record):
 
 def parse_m5_output(align_output, batch_reads_data):
     alignments = dict(
-        (read_fn_sg, None) for read_fn_sg in batch_reads_data.keys())
+        (read_fn_sg, None) for read_fn_sg in list(batch_reads_data.keys()))
     for line in align_output:
-        r_m5_record = dict(zip(M5_FIELDS, line.strip().split()))
+        r_m5_record = dict(list(zip(M5_FIELDS, line.strip().split())))
         if len(r_m5_record) != len(M5_FIELDS):
             continue
         # store the alignment if none is stored for this read or
@@ -567,7 +567,7 @@ def parse_m5_output(align_output, batch_reads_data):
 
     batch_align_failed_reads = []
     batch_align_data = {}
-    for read_fn_sg, r_m5_record in alignments.iteritems():
+    for read_fn_sg, r_m5_record in alignments.items():
         if r_m5_record is None:
             batch_align_failed_reads.append(
                 ('Alignment not produced.', read_fn_sg))
@@ -586,7 +586,7 @@ def parse_sam_record(r_sam_record, genome_index):
         (int(reg_len), reg_type) for reg_len, reg_type in
         CIGAR_PAT.findall(r_sam_record['cigar'])]
     if len(cigar) < 1:
-        raise RuntimeError, 'Invalid cigar string produced.'
+        raise RuntimeError('Invalid cigar string produced.')
 
     strand = '-' if int(r_sam_record['flag']) & 0x10 else '+'
     if strand == '-':
@@ -645,14 +645,14 @@ def parse_sam_record(r_sam_record, genome_index):
     alignVals = []
     for reg_len, reg_type in cigar:
         if reg_type in 'M=X':
-            alignVals.extend(zip(qSeq[:reg_len], tSeq[:reg_len]))
+            alignVals.extend(list(zip(qSeq[:reg_len], tSeq[:reg_len])))
             qSeq = qSeq[reg_len:]
             tSeq = tSeq[reg_len:]
         elif reg_type in 'IP':
-            alignVals.extend(zip(qSeq[:reg_len], repeat('-')))
+            alignVals.extend(list(zip(qSeq[:reg_len], repeat('-'))))
             qSeq = qSeq[reg_len:]
         else:
-            alignVals.extend(zip(repeat('-'), tSeq[:reg_len]))
+            alignVals.extend(list(zip(repeat('-'), tSeq[:reg_len])))
             tSeq = tSeq[reg_len:]
 
     return (alignVals, genomeLoc(
@@ -662,10 +662,10 @@ def parse_sam_record(r_sam_record, genome_index):
 def parse_sam_output(align_output, batch_reads_data, genome_index):
     # create dictionary with empty slot to each read
     alignments = dict(
-        (read_fn_sg, None) for read_fn_sg in batch_reads_data.keys())
+        (read_fn_sg, None) for read_fn_sg in list(batch_reads_data.keys()))
     for line in align_output:
         if line.startswith('@'): continue
-        r_sam_record = dict(zip(SAM_FIELDS, line.strip().split()))
+        r_sam_record = dict(list(zip(SAM_FIELDS, line.strip().split())))
         if len(r_sam_record) < len(SAM_FIELDS): continue
         if r_sam_record['rName'] == '*': continue
         # store the alignment if none is stored for this read or
@@ -678,7 +678,7 @@ def parse_sam_output(align_output, batch_reads_data, genome_index):
 
     batch_align_failed_reads = []
     batch_align_data = {}
-    for read_fn_sg, r_sam_record in alignments.iteritems():
+    for read_fn_sg, r_sam_record in alignments.items():
         if r_sam_record is None:
             batch_align_failed_reads.append(
                 ('Alignment not produced. Potentially failed ' +
@@ -707,7 +707,7 @@ def align_to_genome(batch_reads_data, genome_fn, mapper_exe,
     # prepare fasta text with batch reads
     batch_reads_fasta = ''
     for read_fn_sg, (_, _, basecalls, _, _) in \
-        batch_reads_data.iteritems():
+        batch_reads_data.items():
         # note spaces aren't allowed in read names so replace with
         # vertical bars and undo to retain file names
         batch_reads_fasta += ">" + read_fn_sg.replace(' ', '|||') + \
@@ -730,7 +730,7 @@ def align_to_genome(batch_reads_data, genome_fn, mapper_exe,
                 genome_fn, read_fp.name, num_align_ps)
             stdout_sink = out_fp
         else:
-            raise RuntimeError, 'Mapper not supported.'
+            raise RuntimeError('Mapper not supported.')
 
         try:
             exitStatus = call([mapper_exe,] + mapper_options,
@@ -748,7 +748,7 @@ def align_to_genome(batch_reads_data, genome_fn, mapper_exe,
                 'Ensure you have a compatible version installed.' +
                 'Potentially failed to locate BWA index files.',
                 read_fn_sg) for read_fn_sg
-                     in batch_reads_data.keys()], [])
+                     in list(batch_reads_data.keys())], [])
 
     if output_format == 'sam':
         batch_parse_failed_reads, batch_align_data = parse_sam_output(
@@ -757,7 +757,7 @@ def align_to_genome(batch_reads_data, genome_fn, mapper_exe,
         batch_parse_failed_reads, batch_align_data = parse_m5_output(
             align_output, batch_reads_data)
     else:
-        raise RuntimeError, 'Mapper output type not supported.'
+        raise RuntimeError('Mapper output type not supported.')
 
     clip_fix_align_data = fix_all_clipped_bases(
         batch_align_data, batch_reads_data)
@@ -772,7 +772,7 @@ def fix_stay_states(
     event_change_state = move_states[0]
     while not event_change_state:
         if start_clip >= len(move_states) - 2:
-            raise RuntimeError, (
+            raise RuntimeError(
                 'Read is composed entirely of stay model ' +
                 'states and cannot be processed')
         start_clip += 1
@@ -808,7 +808,7 @@ def get_read_data(fast5_fn, basecall_group, basecall_subgroup):
     try:
         fast5_data = h5py.File(fast5_fn, 'r')
     except:
-        raise NotImplementedError, (
+        raise NotImplementedError(
             'Error opening file for alignment. This should have ' +
             'been caught during the HDF5 prep phase. Check that there ' +
             'are no other nanoraw processes or processes accessing ' +
@@ -824,15 +824,15 @@ def get_read_data(fast5_fn, basecall_group, basecall_subgroup):
             '/Analyses/' + basecall_group + '/' + basecall_subgroup +
             '/Events'].value
     except:
-        raise RuntimeError, (
+        raise RuntimeError(
             'No events or corrupted events in file. Likely a ' +
             'segmentation error or mis-specified basecall-' +
             'subgroups (--2d?).')
     try:
         raw_attrs = dict(
-            fast5_data['/Raw/Reads/'].values()[0].attrs.items())
+            list(fast5_data['/Raw/Reads/'].values())[0].attrs.items())
     except:
-        raise RuntimeError, (
+        raise RuntimeError(
             'Raw data is not stored in Raw/Reads/Read_[read#] so ' +
             'new segments cannot be identified.')
 
@@ -840,8 +840,8 @@ def get_read_data(fast5_fn, basecall_group, basecall_subgroup):
         channel_info = nh.get_channel_info(fast5_data)
         fast5_data.close()
     except:
-        raise RuntimeError, (
-            'Error getting channel information and closing fast5 file.')
+        raise RuntimeError((
+            'Error getting channel information and closing fast5 file.'))
 
     read_id = raw_attrs['read_id']
 
@@ -854,8 +854,8 @@ def get_read_data(fast5_fn, basecall_group, basecall_subgroup):
         if abs_event_start >= raw_attrs['start_time'] - 2:
             read_start_rel_to_raw = 0
         else:
-            raise NotImplementedError, (
-                'Events appear to start before the raw signal.')
+            raise NotImplementedError((
+                'Events appear to start before the raw signal.'))
     else:
         read_start_rel_to_raw = int(
             abs_event_start - raw_attrs['start_time'])
@@ -891,11 +891,11 @@ def get_read_data(fast5_fn, basecall_group, basecall_subgroup):
     if any(len(vals) <= 1 for vals in (
         starts_rel_to_read, basecalls,
         called_dat['model_state'])):
-        raise NotImplementedError, (
-            'One or no segments or signal present in read.')
+        raise NotImplementedError((
+            'One or no segments or signal present in read.'))
     if min(np.diff(starts_rel_to_read)) < 1:
-        raise NotImplementedError, (
-            'Zero length event present in input data.')
+        raise NotImplementedError((
+            'Zero length event present in input data.'))
 
     # remove stay states from the base caller
     (starts_rel_to_read, basecalls,
@@ -1005,7 +1005,7 @@ def align_reads(
     batch_align_failed_reads, batch_align_data = align_and_parse(
         fast5s_to_process, genome_fn, mapper_exe, mapper_type,
         genome_index, basecall_group, basecall_subgroups, num_align_ps)
-    for fast5_fn, sgs_align_data in batch_align_data.iteritems():
+    for fast5_fn, sgs_align_data in batch_align_data.items():
         basecalls_q.put((fast5_fn, sgs_align_data))
     # uncomment to identify mysterious errors
     #print "Prep reads fail: " + str(batch_prep_failed_reads)
@@ -1022,7 +1022,7 @@ def alignment_worker(
     while not fast5_q.empty():
         try:
             fast5_batch = fast5_q.get(block=False)
-        except Queue.Empty:
+        except queue.Empty:
             break
 
         batch_failed_reads = align_reads(
@@ -1063,7 +1063,7 @@ def resquiggle_all_reads(
         mapper_exe, mapper_type, basecall_group, basecall_subgroups,
         corrected_group, overwrite, align_threads_per_proc)
     align_ps = []
-    for p_id in xrange(num_align_ps):
+    for p_id in range(num_align_ps):
         p = mp.Process(target=alignment_worker, args=align_args)
         p.start()
         align_ps.append(p)
@@ -1072,7 +1072,7 @@ def resquiggle_all_reads(
                   corrected_group, norm_type, outlier_thresh, timeout,
                   num_cpts_limit, compute_sd, pore_model)
     resquiggle_ps = []
-    for p_id in xrange(num_resquiggle_ps):
+    for p_id in range(num_resquiggle_ps):
         p = mp.Process(target=resquiggle_worker, args=rsqgl_args)
         p.start()
         resquiggle_ps.append(p)
@@ -1086,20 +1086,20 @@ def resquiggle_all_reads(
         try:
             errorType, fn = failed_reads_q.get(block=False)
             failed_reads[errorType].append(fn)
-        except Queue.Empty:
+        except queue.Empty:
             sleep(1)
             continue
 
     # add None entried to basecalls_q to indicate that all reads have
     # been basecalled and processed
-    for _ in xrange(num_resquiggle_ps):
+    for _ in range(num_resquiggle_ps):
         basecalls_q.put((None, None))
 
     while any(p.is_alive() for p in resquiggle_ps):
         try:
             errorType, fn = failed_reads_q.get(block=False)
             failed_reads[errorType].append(fn)
-        except Queue.Empty:
+        except queue.Empty:
             sleep(1)
             continue
 
@@ -1188,12 +1188,12 @@ def resquiggle_main(args):
         pore_model)
     sys.stderr.write('Failed reads summary:\n' + '\n'.join(
         "\t" + err + " :\t" + str(len(fns))
-        for err, fns in failed_reads.items()) + '\n')
+        for err, fns in list(failed_reads.items())) + '\n')
     if args.failed_reads_filename is not None:
         with open(args.failed_reads_filename, 'w') as fp:
             fp.write('\n'.join((
                 err + '\t' + ','.join(fns)
-                for err, fns in failed_reads.items())) + '\n')
+                for err, fns in list(failed_reads.items()))) + '\n')
 
     return
 

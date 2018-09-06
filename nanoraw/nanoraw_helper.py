@@ -5,7 +5,7 @@ import h5py
 
 import numpy as np
 
-from itertools import izip
+
 from collections import defaultdict, namedtuple
 
 NANORAW_VERSION = '0.5'
@@ -78,7 +78,7 @@ def parse_obs_filter(obs_filter):
              int(pctl_nobs.split(':')[1]))
             for pctl_nobs in obs_filter]
     except:
-        raise RuntimeError, 'Invalid format for observation filter'
+        raise RuntimeError('Invalid format for observation filter')
 
     return obs_filter
 
@@ -86,10 +86,10 @@ def filter_reads(raw_read_coverage, obs_filter):
     if obs_filter is None:
         return raw_read_coverage
 
-    num_reads = len([None for chrm_reads in raw_read_coverage.values()
+    num_reads = len([None for chrm_reads in list(raw_read_coverage.values())
                      for _ in chrm_reads])
     filt_raw_read_cov = {}
-    for chrm, chrm_reads in raw_read_coverage.items():
+    for chrm, chrm_reads in list(raw_read_coverage.items()):
         chrm_filt_reads = [
             r_data for r_data in chrm_reads if not any(
                 np.percentile(np.diff(r_data.segs), pctl) > thresh
@@ -97,7 +97,7 @@ def filter_reads(raw_read_coverage, obs_filter):
         if len(chrm_filt_reads) > 0:
             filt_raw_read_cov[chrm] = chrm_filt_reads
     num_filt_reads = len([
-        None for chrm_reads in filt_raw_read_cov.values()
+        None for chrm_reads in list(filt_raw_read_cov.values())
         for _ in chrm_reads])
     if num_filt_reads < num_reads:
         sys.stderr.write(
@@ -125,7 +125,7 @@ def parse_fast5s(files, corrected_group, basecall_subgroups):
         corr_data = read_data[corr_slot]
 
         try:
-            align_data = dict(corr_data['Alignment'].attrs.items())
+            align_data = dict(list(corr_data['Alignment'].attrs.items()))
             read_start_rel_to_raw = corr_data['Events'].attrs[
                 'read_start_rel_to_raw']
             event_data = corr_data['Events'].value
@@ -155,7 +155,7 @@ def get_channel_info(fast5_data):
     try:
         fast5_info = fast5_data['UniqueGlobalKey/channel_id'].attrs
     except:
-        raise RuntimeError, ("No channel_id group in HDF5 file. " +
+        raise RuntimeError("No channel_id group in HDF5 file. " +
                              "Probably mux scan HDF5 file.")
 
     channel_info = channelInfo(
@@ -172,7 +172,7 @@ def parse_pore_model(pore_model_fn):
             if line.startswith('#'): continue
             try:
                 kmer, lev_mean, lev_stdev = line.split()[:3]
-                lev_mean, lev_stdev = map(float, (lev_mean, lev_stdev))
+                lev_mean, lev_stdev = list(map(float, (lev_mean, lev_stdev)))
             except ValueError:
                 # header or other non-kmer field
                 continue
@@ -208,7 +208,7 @@ def normalize_raw_signal(
         shift=None, scale=None, lower_lim=None, upper_lim=None,
         pore_model=None, event_means=None, event_kmers=None):
     if norm_type not in NORM_TYPES and (shift is None or scale is None):
-        raise NotImplementedError, (
+        raise NotImplementedError(
             'Normalization type ' + norm_type + ' is not a valid ' +
             'option and shift or scale parameters were not provided.')
 
@@ -257,7 +257,7 @@ def normalize_raw_signal(
         raw_signal = np.array([
             upper_lim if outlier_high else
             (lower_lim if outlier_low else x)
-            for x, outlier_high, outlier_low in izip(
+            for x, outlier_high, outlier_low in zip(
                     raw_signal, raw_signal > upper_lim,
                     raw_signal < lower_lim)])
 
@@ -298,7 +298,7 @@ def parse_fasta(fasta_fn):
 def get_coverage(raw_read_coverage):
     if VERBOSE: sys.stderr.write('Calculating read coverage.\n')
     read_coverage = {}
-    for (chrm, strand), reads_data in raw_read_coverage.items():
+    for (chrm, strand), reads_data in list(raw_read_coverage.items()):
         max_end = max(r_data.end for r_data in reads_data)
         chrm_coverage = np.zeros(max_end, dtype=np.int_)
         for r_data in reads_data:
@@ -346,7 +346,7 @@ def get_base_means(raw_read_coverage, chrm_sizes):
     old_err_settings = np.seterr(all='ignore')
     # take the mean over all signal overlapping each base
     mean_base_signal = {}
-    for chrm, strand in [(c, s) for c in chrm_sizes.keys()
+    for chrm, strand in [(c, s) for c in list(chrm_sizes.keys())
                          for s in ('+', '-')]:
         if (chrm, strand) in raw_read_coverage:
             cs_base_means = get_reads_base_means(
@@ -392,7 +392,7 @@ def get_base_sds(raw_read_coverage, chrm_sizes):
     old_err_settings = np.seterr(all='ignore')
     # take the mean over all signal overlapping each base
     mean_base_sds = {}
-    for chrm, strand in [(c, s) for c in chrm_sizes.keys()
+    for chrm, strand in [(c, s) for c in list(chrm_sizes.keys())
                          for s in ('+', '-')]:
         mean_base_sds[(chrm, strand)] = get_reads_base_sds(
             raw_read_coverage[(chrm, strand)], chrm_sizes[chrm],
@@ -434,7 +434,7 @@ def get_base_lengths(raw_read_coverage, chrm_sizes):
     old_err_settings = np.seterr(all='ignore')
     # take the mean over all signal overlapping each base
     mean_base_lengths = {}
-    for chrm, strand in [(c, s) for c in chrm_sizes.keys()
+    for chrm, strand in [(c, s) for c in list(chrm_sizes.keys())
                          for s in ('+', '-')]:
         mean_base_lengths[(chrm, strand)] = get_reads_base_lengths(
             raw_read_coverage[(chrm, strand)], chrm_sizes[chrm],
@@ -467,7 +467,7 @@ def get_reads_events(chrm_strand_reads, rev_strand):
 
     if len(chrm_strand_base_means) == 0: return None
 
-    chrm_signal = np.concatenate(zip(*chrm_strand_base_means)[0])
+    chrm_signal = np.concatenate(list(zip(*chrm_strand_base_means))[0])
     chrm_pos = np.concatenate(
         [np.arange(r_data[1], r_data[2])
          for r_data in chrm_strand_base_means])
@@ -475,14 +475,14 @@ def get_reads_events(chrm_strand_reads, rev_strand):
     as_chrm_pos = np.argsort(chrm_pos)
     # then sort the signal array by genomic position and
     # split into event means by base
-    chrm_strand_base_events = dict(zip(
+    chrm_strand_base_events = dict(list(zip(
         np.unique(chrm_pos[as_chrm_pos]),
         np.split(chrm_signal[as_chrm_pos], np.where(
             np.concatenate([[0,], np.diff(
-                chrm_pos[as_chrm_pos])]) > 0)[0])))
+                chrm_pos[as_chrm_pos])]) > 0)[0]))))
 
     return chrm_strand_base_events
 
 if __name__ == '__main__':
-    raise NotImplementedError, (
-        'This is a module. See commands with `nanoraw -h`')
+    raise NotImplementedError((
+        'This is a module. See commands with `nanoraw -h`'))

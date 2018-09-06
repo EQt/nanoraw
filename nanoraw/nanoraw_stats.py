@@ -5,7 +5,7 @@ import numpy as np
 from scipy import stats
 from collections import defaultdict
 
-import nanoraw_helper as nh
+from . import nanoraw_helper as nh
 
 VERBOSE = False
 
@@ -35,7 +35,7 @@ def calc_fishers_method(pos_pvals, offset):
     pvals_np = np.empty(pos_pvals[-1][1] + 1)
     pvals_np[:] = np.NAN
     pvals_np[[list(zip(*pos_pvals)[1])]] = np.maximum(
-        zip(*pos_pvals)[0], nh.SMALLEST_PVAL)
+        list(zip(*pos_pvals))[0], nh.SMALLEST_PVAL)
 
     fishers_pvals = [
         _calc_fm_pval(pvals_np[pos - offset:pos + offset + 1])
@@ -115,13 +115,13 @@ def get_all_significance(
                        chrm_strand_base_events2[pos].shape[0])
                 >= min_test_vals]
         else:
-            raise RuntimeError, ('Invalid significance test type ' +
+            raise RuntimeError('Invalid significance test type ' +
                                  'provided: ' + str(test_type))
 
         if len(chrm_pvals) == 0: continue
         chrm_pvals_f = calc_fishers_method(
             chrm_pvals, fishers_method_offset) \
-            if fishers_method_offset > 0 else zip(*chrm_pvals)[0]
+            if fishers_method_offset > 0 else list(zip(*chrm_pvals))[0]
 
         position_pvals.extend(
             (pval_f, pval, pos, chrm, strand, cov1, cov2)
@@ -135,7 +135,7 @@ def get_all_significance(
         sys.exit()
 
     position_pvals = sorted(position_pvals)
-    fdr_corr_pvals_f = correct_multiple_testing(zip(*position_pvals)[0])
+    fdr_corr_pvals_f = correct_multiple_testing(list(zip(*position_pvals))[0])
     fdr_corr_pvals = correct_multiple_testing(
         sorted(zip(*position_pvals)[1]))
     all_stats = [(pval_f, qval_f, pval, qval,
@@ -150,7 +150,7 @@ def get_all_significance(
             chrm_strand_stats[(chrm, strand)].append((
                 pos, pval_f, qval_f, pval, qval, cov1, cov2))
         with open(all_stats_fn, 'w') as stats_fp:
-            for (chrm, strand), pos_stats in chrm_strand_stats.items():
+            for (chrm, strand), pos_stats in list(chrm_strand_stats.items()):
                 stats_fp.write('>>>>::' + chrm + '::' + strand + '\n')
                 stats_fp.write('\n'.join([
                     '{:d}\t{:.2g}\t{:.2g}\t{:.2g}\t{:.2g}\t{:d}\t{:d}'.format(
@@ -174,12 +174,12 @@ def get_most_signif_regions(all_stats, num_bases, num_regions,
                     all_stats[0][1]) + '*' * 60 + '\n')
             sys.exit()
 
-    plot_intervals = zip(
+    plot_intervals = list(zip(
         ['{:03d}'.format(rn) for rn in range(num_regions)],
         [(chrm, max(pos - int(num_bases / 2.0), 0), strand,
           '(q-value:{0:.2g} p-value:{1:.2g})'.format(qval_f, pval_f))
          for pval_f, qval_f, pval, qval, pos, chrm, strand, cov1, cov2 in
-         all_stats[:num_regions]])
+         all_stats[:num_regions]]))
 
     return plot_intervals
 
@@ -251,5 +251,5 @@ def get_pairwise_dists(reg_sig_diffs, index_q, dists_q, slide_span=None):
 
 
 if __name__ == '__main__':
-    raise NotImplementedError, (
-        'This is a module. See commands with `nanoraw -h`')
+    raise NotImplementedError((
+        'This is a module. See commands with `nanoraw -h`'))

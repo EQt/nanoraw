@@ -1,14 +1,14 @@
 import sys
 
-import option_parsers
+from . import option_parsers
 
-import resquiggle
-import plot_commands
-import text_output_commands
+from . import resquiggle
+from . import plot_commands
+from . import text_output_commands
 
 from collections import OrderedDict
 
-import nanoraw_helper as nh
+from . import nanoraw_helper as nh
 
 def main(args=None):
     """The main routine."""
